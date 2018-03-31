@@ -155,6 +155,9 @@ int main(int, char**)
 	float handleRightKeys[]{ 0.0f, 0.0f };
 	float handleRightValues[]{ 0.0f, 0.0f };
 
+	bool kv_selected[]{ false, false, false };
+	bool selected = true;
+
     // Main loop
     MSG msg;
     ZeroMemory(&msg, sizeof(msg));
@@ -205,10 +208,23 @@ int main(int, char**)
 		{
 			ImGui::Begin("FCurve", &show_fcurve_window);
 
-			ImGui::FCurveVec2(
-				keys1, value1, handleLeftKeys, handleLeftValues, handleRightKeys, handleRightValues, 2,
-				keys1, value1, handleLeftKeys, handleLeftValues, handleRightKeys, handleRightValues, 2,
-				nullptr, nullptr);
+			if (ImGui::BeginFCurve())
+			{
+				ImGui::FCurve(
+					keys1, value1, handleLeftKeys, handleLeftValues, handleRightKeys, handleRightValues,
+					kv_selected,
+					2,
+					false,
+					0xFF0000FF,
+					&selected,
+					nullptr,
+					nullptr,
+					nullptr,
+					nullptr
+				);
+			}
+
+			ImGui::EndFCurve();
 
 			ImGui::End();
 		}
