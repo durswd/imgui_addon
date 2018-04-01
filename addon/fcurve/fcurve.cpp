@@ -6,10 +6,6 @@
 
 namespace ImGui
 {
-	/**
-		Todo
-		how to multi select point
-	*/
 	static ImVec2 operator+(const ImVec2& lhs, const ImVec2& rhs)
 	{
 		return ImVec2(lhs.x + rhs.x, lhs.y + rhs.y);
@@ -263,6 +259,12 @@ namespace ImGui
 		float* movedY,
 		int* changedType)
 	{
+		auto selected_ = true;
+		if (selected != nullptr)
+		{
+			selected_ = (*selected);
+		}
+
 		ImGuiWindow* window = GetCurrentWindow();
 
 		float offset_x = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::OFFSET_X, 0.0f);
@@ -290,18 +292,18 @@ namespace ImGui
 			return transform_s2f(sp);
 		};
 
-		bool hasControled = false;
+		bool hasControlled = false;
 
 		if (isLocked)
 		{
-			hasControled = true;
+			hasControlled = true;
 		}
 
 		auto dx = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::DELTA_X, 0.0f);
 		auto dy = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::DELTA_Y, 0.0f);
 
 		// move points
-		if (!hasControled && (*selected))
+		if (!hasControlled && selected_)
 		{
 			int32_t movedIndex = -1;
 
@@ -343,7 +345,7 @@ namespace ImGui
 				if (IsItemActive() && IsMouseDragging(0))
 				{
 					movedIndex = i;
-					hasControled = true;
+					hasControlled = true;
 					isChanged = true;
 				}
 
@@ -469,7 +471,7 @@ namespace ImGui
 		}
 
 		// move left handles
-		if (!hasControled && (*selected))
+		if (!hasControlled && selected_)
 		{
 			int32_t movedLIndex = -1;
 			for (int i = 0; i < count; i++)
@@ -505,7 +507,7 @@ namespace ImGui
 				if (IsItemActive() && IsMouseDragging(0))
 				{
 					isChanged = true;
-					hasControled = true;
+					hasControlled = true;
 					movedLIndex = i;
 				}
 
@@ -548,7 +550,7 @@ namespace ImGui
 		}
 
 		// move right handles
-		if (!hasControled && (*selected))
+		if (!hasControlled && selected_)
 		{
 			int32_t movedRIndex = -1;
 			for (int i = 0; i < count; i++)
@@ -584,7 +586,7 @@ namespace ImGui
 				if (IsItemActive() && IsMouseDragging(0))
 				{
 					isChanged = true;
-					hasControled = true;
+					hasControlled = true;
 					movedRIndex = i;
 				}
 
@@ -651,7 +653,7 @@ namespace ImGui
 		}
 
 		// remove point
-		if (!hasControled && (*selected) && IsMouseDoubleClicked(0))
+		if (!hasControlled && selected_ && IsMouseDoubleClicked(0))
 		{
 			auto mousePos = GetMousePos();
 			auto v = transform_s2f(mousePos);
@@ -675,14 +677,14 @@ namespace ImGui
 				}
 
 				(*newCount) = count - 1;
-				hasControled = true;
+				hasControlled = true;
 				break;
 
 			}
 		}
 
 		// Add point
-		if(!hasControled && (*selected))
+		if(!hasControlled && selected_)
 		{
 			if (isLineHovered && IsMouseDoubleClicked(0))
 			{
@@ -713,7 +715,7 @@ namespace ImGui
 						kv_selected[i + 1] = false;
 
 						(*newCount) = count + 1;
-						hasControled = true;
+						hasControlled = true;
 						break;
 					}
 				}
@@ -721,7 +723,7 @@ namespace ImGui
 		}
 
 		// is line selected
-		if (selected != nullptr && !hasControled && !isLocked && IsMouseClicked(0))
+		if (selected != nullptr && !hasControlled && !isLocked && IsMouseClicked(0))
 		{
 			if (isLineHovered)
 			{
@@ -732,12 +734,6 @@ namespace ImGui
 		// render curve
 		for (int i = 0; i < count - 1; i++)
 		{
-			auto selected_ = false;
-			if (selected != nullptr)
-			{
-				selected_ = (*selected);
-			}
-
 			auto v1 = ImVec2(keys[i + 0], values[i + 0]);
 			auto v2 = ImVec2(keys[i + 1], values[i + 1]);
 

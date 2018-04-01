@@ -97,6 +97,56 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
+#include <vector>
+#include <array>
+
+struct FCurveProperty
+{
+	std::vector<float> keys;
+	std::vector<float> values;
+
+	std::vector<float> left_keys;
+	std::vector<float> left_values;
+
+	std::vector<float> right_keys;
+	std::vector<float> right_values;
+
+	std::vector<int8_t> kv_selected;
+
+	bool isSelected = false;
+	int count = 2;
+	ImColor col = 0xff0000ff;
+
+	FCurveProperty()
+	{
+		for (int i = 0; i < 2; i++)
+		{
+			auto k = i * 10;
+			auto v = i * 10;
+
+			keys.push_back(k);
+			values.push_back(v);
+			
+			left_keys.push_back(k -5);
+			left_values.push_back(v - 5);
+
+			right_keys.push_back(k + 5);
+			right_values.push_back(v + 5);
+
+			kv_selected.push_back(0);
+		}
+
+		keys.push_back(0);
+		values.push_back(0);
+		left_keys.push_back(0);
+		left_values.push_back(0);
+		right_keys.push_back(0);
+		right_values.push_back(0);
+
+		kv_selected.push_back(0);
+	}
+};
+
 int main(int, char**)
 {
     // Create application window
@@ -146,18 +196,7 @@ int main(int, char**)
 	bool show_fcurve_window = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-	float keys1[]{ 0.0f, 10.0f, 0.0f };
-	float value1[]{ 0.0f, 10.0f, 0.0f };
-
-	float handleLeftKeys[]{ 0.0f, 0.0f, 0.0f };
-	float handleLeftValues[]{ 0.0f, 0.0f, 0.0f };
-
-	float handleRightKeys[]{ 0.0f, 0.0f, 0.0f };
-	float handleRightValues[]{ 0.0f, 0.0f, 0.0f };
-
-	bool kv_selected[]{ false, false, false };
-	bool selected = false;
-	int kv_count = 2;
+	std::array<FCurveProperty, 1> props;
 
     // Main loop
     MSG msg;
@@ -211,18 +250,23 @@ int main(int, char**)
 
 			if (ImGui::BeginFCurve())
 			{
-				ImGui::FCurve(
-					keys1, value1, handleLeftKeys, handleLeftValues, handleRightKeys, handleRightValues,
-					kv_selected,
-					kv_count,
-					false,
-					0xFF0000FF,
-					&selected,
-					&kv_count,
-					nullptr,
-					nullptr,
-					nullptr
-				);
+				for (int i = 0; i < props.size(); i++)
+				{
+					auto& prop = props[i];
+
+					ImGui::FCurve(
+						prop.keys.data(), prop.values.data(), prop.left_keys.data(), prop.left_values.data(), prop.right_keys.data(), prop.right_values.data(),
+						(bool*)prop.kv_selected.data(),
+						prop.count,
+						false,
+						prop.col,
+						&prop.isSelected,
+						&prop.count,
+						nullptr,
+						nullptr,
+						nullptr
+					);
+				}				
 			}
 
 			ImGui::EndFCurve();
