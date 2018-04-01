@@ -149,14 +149,15 @@ int main(int, char**)
 	float keys1[]{ 0.0f, 10.0f, 0.0f };
 	float value1[]{ 0.0f, 10.0f, 0.0f };
 
-	float handleLeftKeys[]{ 0.0f, 0.0f };
-	float handleLeftValues[]{ 0.0f, 0.0f };
+	float handleLeftKeys[]{ 0.0f, 0.0f, 0.0f };
+	float handleLeftValues[]{ 0.0f, 0.0f, 0.0f };
 
-	float handleRightKeys[]{ 0.0f, 0.0f };
-	float handleRightValues[]{ 0.0f, 0.0f };
+	float handleRightKeys[]{ 0.0f, 0.0f, 0.0f };
+	float handleRightValues[]{ 0.0f, 0.0f, 0.0f };
 
 	bool kv_selected[]{ false, false, false };
 	bool selected = false;
+	int kv_count = 2;
 
     // Main loop
     MSG msg;
@@ -213,11 +214,11 @@ int main(int, char**)
 				ImGui::FCurve(
 					keys1, value1, handleLeftKeys, handleLeftValues, handleRightKeys, handleRightValues,
 					kv_selected,
-					2,
+					kv_count,
 					false,
 					0xFF0000FF,
 					&selected,
-					nullptr,
+					&kv_count,
 					nullptr,
 					nullptr,
 					nullptr

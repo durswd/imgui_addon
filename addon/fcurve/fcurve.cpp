@@ -9,7 +9,6 @@ namespace ImGui
 	/**
 		Todo
 		how to multi select point
-		add/remove point
 	*/
 	static ImVec2 operator+(const ImVec2& lhs, const ImVec2& rhs)
 	{
@@ -291,16 +290,19 @@ namespace ImGui
 			return transform_s2f(sp);
 		};
 
-		if (isLocked || !(*selected))
-		{
+		bool hasControled = false;
 
+		if (isLocked)
+		{
+			hasControled = true;
 		}
-		else
-		{
-			auto dx = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::DELTA_X, 0.0f);
-			auto dy = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::DELTA_Y, 0.0f);
 
-			// move points
+		auto dx = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::DELTA_X, 0.0f);
+		auto dy = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::DELTA_Y, 0.0f);
+
+		// move points
+		if (!hasControled && (*selected))
+		{
 			int32_t movedIndex = -1;
 
 			for (int i = 0; i < count; i++)
@@ -334,13 +336,14 @@ namespace ImGui
 							kv_selected[j] = false;
 						}
 					}
-					
+
 					kv_selected[i] = !kv_selected[i];
 				}
 
 				if (IsItemActive() && IsMouseDragging(0))
 				{
 					movedIndex = i;
+					hasControled = true;
 					isChanged = true;
 				}
 
@@ -373,7 +376,7 @@ namespace ImGui
 						keys[i] = v.x;
 						values[i] = v.y;
 					}
-					
+
 					{
 						auto v = moveFWithS(ImVec2(leftHandleKeys[i], leftHandleValues[i]), ImVec2(dx, dy));
 						leftHandleKeys[i] = v.x;
@@ -463,8 +466,11 @@ namespace ImGui
 					}
 				}
 			}
+		}
 
-			// move left handles
+		// move left handles
+		if (!hasControled && (*selected))
+		{
 			int32_t movedLIndex = -1;
 			for (int i = 0; i < count; i++)
 			{
@@ -499,6 +505,7 @@ namespace ImGui
 				if (IsItemActive() && IsMouseDragging(0))
 				{
 					isChanged = true;
+					hasControled = true;
 					movedLIndex = i;
 				}
 
@@ -538,8 +545,11 @@ namespace ImGui
 					leftHandleKeys[i] = std::min(leftHandleKeys[i], keys[i]);
 				}
 			}
+		}
 
-			// move right handles
+		// move right handles
+		if (!hasControled && (*selected))
+		{
 			int32_t movedRIndex = -1;
 			for (int i = 0; i < count; i++)
 			{
@@ -574,6 +584,7 @@ namespace ImGui
 				if (IsItemActive() && IsMouseDragging(0))
 				{
 					isChanged = true;
+					hasControled = true;
 					movedRIndex = i;
 				}
 
@@ -615,8 +626,8 @@ namespace ImGui
 			}
 		}
 
-		// is line selected
-		if (selected != nullptr && IsMouseClicked(0))
+
+		bool isLineHovered = false;
 		{
 			for (int i = 0; i < count - 1; i++)
 			{
@@ -626,7 +637,7 @@ namespace ImGui
 				auto cp1 = ImVec2(rightHandleKeys[i + 0], rightHandleValues[i + 0]);
 				auto cp2 = ImVec2(leftHandleKeys[i + 1], leftHandleValues[i + 1]);
 
-				(*selected) = (*selected) | IsHoveredOnBezierCurve(
+				isLineHovered = isLineHovered | IsHoveredOnBezierCurve(
 					GetMousePos(), window,
 					transform_f2s(v1),
 					transform_f2s(cp1),
@@ -635,7 +646,86 @@ namespace ImGui
 					col,
 					2);
 
-				if ((*selected)) break;
+				if (isLineHovered) break;
+			}
+		}
+
+		// remove point
+		if (!hasControled && (*selected) && IsMouseDoubleClicked(0))
+		{
+			auto mousePos = GetMousePos();
+			auto v = transform_s2f(mousePos);
+
+			for (int i = 0; i < count - 1; i++)
+			{
+				auto p = transform_f2s(ImVec2(keys[i], values[i]));
+
+				if (!IsHovered(mousePos, p, 3)) continue;
+
+
+				for (int j = i; j < count - 1; j++)
+				{
+					keys[j] = keys[j + 1];
+					values[j] = values[j + 1];
+					leftHandleKeys[j] = leftHandleKeys[j + 1];
+					leftHandleValues[j] = leftHandleValues[j + 1];
+					rightHandleKeys[j] = rightHandleKeys[j + 1];
+					rightHandleValues[j] = rightHandleValues[j + 1];
+					kv_selected[j] = kv_selected[j + 1];
+				}
+
+				(*newCount) = count - 1;
+				hasControled = true;
+				break;
+
+			}
+		}
+
+		// Add point
+		if(!hasControled && (*selected))
+		{
+			if (isLineHovered && IsMouseDoubleClicked(0))
+			{
+				auto mousePos = GetMousePos();
+				auto v = transform_s2f(mousePos);
+
+				for (int i = 0; i < count - 1; i++)
+				{
+					if (keys[i] <= v.x && v.x < keys[i + 1])
+					{
+						for (int j = count; j > i; j--)
+						{
+							keys[j] = keys[j - 1];
+							values[j] = values[j - 1];
+							leftHandleKeys[j] = leftHandleKeys[j - 1];
+							leftHandleValues[j] = leftHandleValues[j - 1];
+							rightHandleKeys[j] = rightHandleKeys[j - 1];
+							rightHandleValues[j] = rightHandleValues[j - 1];
+							kv_selected[j] = kv_selected[j - 1];
+						}
+
+						keys[i + 1] = v.x;
+						values[i + 1] = v.y;
+						leftHandleKeys[i + 1] = v.x;
+						leftHandleValues[i + 1] = v.y;
+						rightHandleKeys[i + 1] = v.x;
+						rightHandleValues[i + 1] = v.y;
+						kv_selected[i + 1] = false;
+
+						(*newCount) = count + 1;
+						hasControled = true;
+						break;
+					}
+				}
+			}
+		}
+
+		// is line selected
+		if (selected != nullptr && !hasControled && !isLocked && IsMouseClicked(0))
+		{
+			if (isLineHovered)
+			{
+				(*selected) = (*selected) | isLineHovered;
 			}
 		}
 
@@ -650,7 +740,7 @@ namespace ImGui
 
 			auto v1 = ImVec2(keys[i + 0], values[i + 0]);
 			auto v2 = ImVec2(keys[i + 1], values[i + 1]);
-			
+
 			auto cp1 = ImVec2(rightHandleKeys[i + 0], rightHandleValues[i + 0]);
 			auto cp2 = ImVec2(leftHandleKeys[i + 1], leftHandleValues[i + 1]);
 
