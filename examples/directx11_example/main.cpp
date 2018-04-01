@@ -156,7 +156,7 @@ int main(int, char**)
 	float handleRightValues[]{ 0.0f, 0.0f };
 
 	bool kv_selected[]{ false, false, false };
-	bool selected = true;
+	bool selected = false;
 
     // Main loop
     MSG msg;

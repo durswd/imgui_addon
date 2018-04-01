@@ -9,7 +9,6 @@ namespace ImGui
 	/**
 		Todo
 		how to multi select point
-		select curve
 		add/remove point
 	*/
 	static ImVec2 operator+(const ImVec2& lhs, const ImVec2& rhs)
@@ -17,11 +16,41 @@ namespace ImGui
 		return ImVec2(lhs.x + rhs.x, lhs.y + rhs.y);
 	}
 
+	static ImVec2 operator-(const ImVec2& lhs, const ImVec2& rhs)
+	{
+		return ImVec2(lhs.x - rhs.x, lhs.y - rhs.y);
+	}
+
+	static ImVec2 operator * (const ImVec2& lhs, float rhs)
+	{
+		return ImVec2(lhs.x * rhs, lhs.y * rhs);
+	}
+
+	static ImVec2 operator / (const ImVec2& lhs, float rhs)
+	{
+		return ImVec2(lhs.x / rhs, lhs.y / rhs);
+	}
+
 	static ImVec2& operator+=(ImVec2& lhs, const ImVec2& rhs)
 	{
 		lhs.x += rhs.x;
 		lhs.y += rhs.y;
 		return lhs;
+	}
+
+	static float Dot(const ImVec2& lhs, const ImVec2& rhs)
+	{
+		return lhs.x * rhs.x + lhs.y * rhs.y;
+	}
+
+	static float ImLength(const ImVec2& lhs)
+	{
+		return sqrt(ImLengthSqr(lhs));
+	}
+
+	static ImVec2 ImNorm(const ImVec2& lhs)
+	{
+		return lhs / ImLength(lhs);
 	}
 
 	enum class FCurveStorageValues : ImGuiID
@@ -44,6 +73,73 @@ namespace ImGui
 		diff.y = v1.y - v2.y;
 		return diff.x * diff.x + diff.y * diff.y < radius * radius;
 	}
+
+	bool IsHoveredOnLine(const ImVec2& v, ImGuiWindow* window, const ImVec2& a, const ImVec2& b, ImU32 col, float thickness)
+	{
+		if ((col & IM_COL32_A_MASK) == 0)
+			return false;
+
+		window->DrawList->PathLineTo(a + ImVec2(0.5f, 0.5f));
+		window->DrawList->PathLineTo(b + ImVec2(0.5f, 0.5f));
+
+		bool isHovered = false;
+
+		for (int32_t i = 0; i < window->DrawList->_Path.size() - 1; i++)
+		{
+			auto v1 = window->DrawList->_Path[i + 0];
+			auto v2 = window->DrawList->_Path[i + 1];
+
+			auto p0 = v - v1;
+			auto p1 = v2 - v1;
+
+			auto n = ImNorm(p1);
+			auto component1 = n * ImDot(n, p0);
+			auto component2 = p0 - component1;
+
+			if (ImLength(component1) > ImLength(p1)) continue;
+			if (ImLength(component2) > thickness) continue;
+			isHovered = true;
+			break;
+		}
+	
+		window->DrawList->PathClear();
+
+		return isHovered;
+	}
+
+	bool IsHoveredOnBezierCurve(const ImVec2& v, ImGuiWindow* window, const ImVec2& pos0, const ImVec2& cp0, const ImVec2& cp1, const ImVec2& pos1, ImU32 col, float thickness)
+	{
+		if ((col & IM_COL32_A_MASK) == 0)
+			return false;
+
+		window->DrawList->PathLineTo(pos0);
+		window->DrawList->PathBezierCurveTo(cp0, cp1, pos1, 0);
+
+		bool isHovered = false;
+
+		for (int32_t i = 0; i < window->DrawList->_Path.size() - 1; i++)
+		{
+			auto v1 = window->DrawList->_Path[i + 0];
+			auto v2 = window->DrawList->_Path[i + 1];
+
+			auto p0 = v - v1;
+			auto p1 = v2 - v1;
+
+			auto n = ImNorm(p1);
+			auto component1 = n * ImDot(n, p0);
+			auto component2 = p0 - component1;
+
+			if (ImLength(component1) > ImLength(p1)) continue;
+			if (ImLength(component2) > thickness) continue;
+			isHovered = true;
+			break;
+		}
+
+		window->DrawList->PathClear();
+
+		return isHovered;
+	}
+
 
 	bool BeginFCurve()
 	{
@@ -519,16 +615,52 @@ namespace ImGui
 			}
 		}
 
+		// is line selected
+		if (selected != nullptr && IsMouseClicked(0))
+		{
+			for (int i = 0; i < count - 1; i++)
+			{
+				auto v1 = ImVec2(keys[i + 0], values[i + 0]);
+				auto v2 = ImVec2(keys[i + 1], values[i + 1]);
+
+				auto cp1 = ImVec2(rightHandleKeys[i + 0], rightHandleValues[i + 0]);
+				auto cp2 = ImVec2(leftHandleKeys[i + 1], leftHandleValues[i + 1]);
+
+				(*selected) = (*selected) | IsHoveredOnBezierCurve(
+					GetMousePos(), window,
+					transform_f2s(v1),
+					transform_f2s(cp1),
+					transform_f2s(cp2),
+					transform_f2s(v2),
+					col,
+					2);
+
+				if ((*selected)) break;
+			}
+		}
 
 		// render curve
 		for (int i = 0; i < count - 1; i++)
 		{
+			auto selected_ = false;
+			if (selected != nullptr)
+			{
+				selected_ = (*selected);
+			}
+
 			auto v1 = ImVec2(keys[i + 0], values[i + 0]);
 			auto v2 = ImVec2(keys[i + 1], values[i + 1]);
-			window->DrawList->AddLine(
+			
+			auto cp1 = ImVec2(rightHandleKeys[i + 0], rightHandleValues[i + 0]);
+			auto cp2 = ImVec2(leftHandleKeys[i + 1], leftHandleValues[i + 1]);
+
+			window->DrawList->AddBezierCurve(
 				transform_f2s(v1),
+				transform_f2s(cp1),
+				transform_f2s(cp2),
 				transform_f2s(v2),
-				col);
+				col,
+				selected_ ? 2 : 1);
 		}
 
 		// render selected
