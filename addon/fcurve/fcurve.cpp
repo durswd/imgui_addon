@@ -246,6 +246,7 @@ namespace ImGui
 	}
 
 	bool FCurve(
+		int fcurve_id,
 		float* keys, float* values,
 		float* leftHandleKeys, float* leftHandleValues,
 		float* rightHandleKeys, float* rightHandleValues,
@@ -253,17 +254,14 @@ namespace ImGui
 		int count,
 		bool isLocked,
 		ImU32 col,
-		bool* selected,
+		bool selected,
 		int* newCount,
+		bool* newSelected,
 		float* movedX,
 		float* movedY,
 		int* changedType)
 	{
-		auto selected_ = true;
-		if (selected != nullptr)
-		{
-			selected_ = (*selected);
-		}
+		PushID(fcurve_id);
 
 		ImGuiWindow* window = GetCurrentWindow();
 
@@ -303,7 +301,7 @@ namespace ImGui
 		auto dy = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::DELTA_Y, 0.0f);
 
 		// move points
-		if (!hasControlled && selected_)
+		if (!hasControlled && selected)
 		{
 			int32_t movedIndex = -1;
 
@@ -471,7 +469,7 @@ namespace ImGui
 		}
 
 		// move left handles
-		if (!hasControlled && selected_)
+		if (!hasControlled && selected)
 		{
 			int32_t movedLIndex = -1;
 			for (int i = 0; i < count; i++)
@@ -481,7 +479,6 @@ namespace ImGui
 				auto isChanged = false;
 				float pointSize = 4;
 
-				auto centerPos = transform_f2s(ImVec2(keys[i], values[i]));
 				auto pos = transform_f2s(ImVec2(leftHandleKeys[i], leftHandleValues[i]));
 				auto cursorPos = GetCursorPos();
 
@@ -489,8 +486,6 @@ namespace ImGui
 				PushID(i + 0x1f0);
 
 				InvisibleButton("", ImVec2(pointSize * 2, pointSize * 2));
-
-				window->DrawList->AddLine(pos, centerPos, 0x55000000);
 
 				if (IsItemHovered())
 				{
@@ -550,7 +545,7 @@ namespace ImGui
 		}
 
 		// move right handles
-		if (!hasControlled && selected_)
+		if (!hasControlled && selected)
 		{
 			int32_t movedRIndex = -1;
 			for (int i = 0; i < count; i++)
@@ -560,7 +555,6 @@ namespace ImGui
 				auto isChanged = false;
 				float pointSize = 4;
 
-				auto centerPos = transform_f2s(ImVec2(keys[i], values[i]));
 				auto pos = transform_f2s(ImVec2(rightHandleKeys[i], rightHandleValues[i]));
 				auto cursorPos = GetCursorPos();
 
@@ -568,8 +562,6 @@ namespace ImGui
 				PushID(i + 0xaf0);
 
 				InvisibleButton("", ImVec2(pointSize * 2, pointSize * 2));
-
-				window->DrawList->AddLine(pos, centerPos, 0x55000000);
 
 				if (IsItemHovered())
 				{
@@ -653,7 +645,7 @@ namespace ImGui
 		}
 
 		// remove point
-		if (!hasControlled && selected_ && IsMouseDoubleClicked(0))
+		if (!hasControlled && selected && IsMouseDoubleClicked(0))
 		{
 			auto mousePos = GetMousePos();
 			auto v = transform_s2f(mousePos);
@@ -684,7 +676,7 @@ namespace ImGui
 		}
 
 		// Add point
-		if(!hasControlled && selected_)
+		if(!hasControlled && selected)
 		{
 			if (isLineHovered && IsMouseDoubleClicked(0))
 			{
@@ -723,11 +715,11 @@ namespace ImGui
 		}
 
 		// is line selected
-		if (selected != nullptr && !hasControlled && !isLocked && IsMouseClicked(0))
+		if (newSelected != nullptr && !hasControlled && !isLocked && IsMouseClicked(0))
 		{
 			if (isLineHovered)
 			{
-				(*selected) = (*selected) | isLineHovered;
+				(*newSelected) = (*newSelected) | isLineHovered;
 			}
 		}
 
@@ -746,23 +738,42 @@ namespace ImGui
 				transform_f2s(cp2),
 				transform_f2s(v2),
 				col,
-				selected_ ? 2 : 1);
+				selected ? 2 : 1);
 		}
 
-		// render selected
-		for (int i = 0; i < count; i++)
+		// render points
+		if (selected)
 		{
-			if (!kv_selected[i]) continue;
+			for (int i = 0; i < count; i++)
+			{
+				if (kv_selected[i])
+				{
+					int pointSize = 4;
+					auto pos = transform_f2s(ImVec2(keys[i], values[i]));
 
-			int pointSize = 4;
-			auto pos = transform_f2s(ImVec2(keys[i], values[i]));
+					window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55FFFFFF);
+					window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55FFFFFF);
+					window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55FFFFFF);
+					window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55FFFFFF);
 
-			window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55FFFFFF);
-			window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55FFFFFF);
-			window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55FFFFFF);
-			window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55FFFFFF);
+					window->DrawList->AddLine(transform_f2s(ImVec2(leftHandleKeys[i], leftHandleValues[i])), pos, 0x55FFFFFF);
+					window->DrawList->AddLine(transform_f2s(ImVec2(rightHandleKeys[i], rightHandleValues[i])), pos, 0x55FFFFFF);
+				}
+				else
+				{
+					int pointSize = 2;
+					auto pos = transform_f2s(ImVec2(keys[i], values[i]));
+
+					window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55FFFFFF);
+					window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55FFFFFF);
+					window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55FFFFFF);
+					window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55FFFFFF);
+				}
+			}
 		}
 
-		return true;
+		PopID();
+
+		return hasControlled;
 	}
 }

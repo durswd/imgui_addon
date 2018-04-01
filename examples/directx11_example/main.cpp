@@ -196,7 +196,15 @@ int main(int, char**)
 	bool show_fcurve_window = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-	std::array<FCurveProperty, 1> props;
+	std::array<FCurveProperty, 3> props;
+
+	for (auto i = 0; i < props.size(); i++)
+	{
+		for (auto j = 0; j < props[i].values.size(); j++)
+		{
+			props[i].values[j] -= 5 * i;
+		}
+	}
 
     // Main loop
     MSG msg;
@@ -254,18 +262,39 @@ int main(int, char**)
 				{
 					auto& prop = props[i];
 
-					ImGui::FCurve(
+					bool isSelected = false;
+
+					if (ImGui::FCurve(
+						i,
 						prop.keys.data(), prop.values.data(), prop.left_keys.data(), prop.left_values.data(), prop.right_keys.data(), prop.right_values.data(),
 						(bool*)prop.kv_selected.data(),
 						prop.count,
 						false,
 						prop.col,
-						&prop.isSelected,
+						prop.isSelected,
 						&prop.count,
+						&isSelected,
 						nullptr,
 						nullptr,
 						nullptr
-					);
+					))
+					{
+						if (isSelected)
+						{
+							if (ImGui::GetIO().KeyShift)
+							{
+								prop.isSelected = true;
+							}
+							else
+							{
+								for (int j = 0; j < props.size(); j++)
+								{
+									props[j].isSelected = false;
+								}
+								prop.isSelected = true;
+							}
+						}
+					}
 				}				
 			}
 

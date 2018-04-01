@@ -16,6 +16,7 @@ namespace ImGui
 	void EndFCurve();
 
 	bool FCurve(
+		int fcurve_id,
 		float* keys, float* values,
 		float* leftHandleKeys, float* leftHandleValues,
 		float* rightHandleKeys, float* rightHandleValues,
@@ -23,8 +24,9 @@ namespace ImGui
 		int count,
 		bool isLocked,
 		ImU32 col,
-		bool* selected,
+		bool selected,
 		int* newCount,
+		bool* newSelected,
 		float* movedX,
 		float* movedY,
 		int* changedType);
