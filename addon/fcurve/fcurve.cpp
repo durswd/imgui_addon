@@ -6,6 +6,12 @@
 
 namespace ImGui
 {
+	/**
+		Todo
+		how to multi select point
+		select curve
+		add/remove point
+	*/
 	static ImVec2 operator+(const ImVec2& lhs, const ImVec2& rhs)
 	{
 		return ImVec2(lhs.x + rhs.x, lhs.y + rhs.y);
@@ -27,33 +33,29 @@ namespace ImGui
 		IS_PANNING,
 		START_X,
 		START_Y,
+		DELTA_X,
+		DELTA_Y,
 	};
 
-	void FCurveVec2(
-		float* keys1, float* values1,
-		float* leftHandleKeys1, float* leftHandleValue1,
-		float* rightHandleKeys1, float* rightHandleValues1,
-		int count1,
-
-		float* keys2, float* values2,
-		float* leftHandleKeys2, float* leftHandleValue2,
-		float* rightHandleKeys2, float* rightHandleValues2,
-		int count2,
-
-		float* newCount1,
-		float* newCount2)
+	bool IsHovered(const ImVec2& v1, const ImVec2& v2, float radius)
 	{
-		if(!BeginChildFrame(1, ImVec2(200, 200), ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+		ImVec2 diff;
+		diff.x = v1.x - v2.x;
+		diff.y = v1.y - v2.y;
+		return diff.x * diff.x + diff.y * diff.y < radius * radius;
+	}
+
+	bool BeginFCurve()
+	{
+		if (!BeginChildFrame(1, ImVec2(200, 200), ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
 		{
-			EndChildFrame();
-			return;
+			return false;
 		}
 
 		ImGuiWindow* window = GetCurrentWindow();
 		if (window->SkipItems)
 		{
-			EndChildFrame();
-			return;
+			return false;
 		}
 
 		bool isGridShown = true;
@@ -132,152 +134,417 @@ namespace ImGui
 			}
 		}
 
-		// move points
-		for (int i = 0; i < count1; i++)
+		// get left button drag
+		if (IsMouseDragging(0))
 		{
-			auto isChanged = false;
-			float pointSize = 4;
+			window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::DELTA_X, GetIO().MouseDelta.x);
+			window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::DELTA_Y, GetIO().MouseDelta.y);
+		}
+		else
+		{
+			window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::DELTA_X, 0);
+			window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::DELTA_Y, 0);
+		}
 
-			auto pos = transform_f2s(ImVec2(keys1[i], values1[i]));
-			auto cursorPos = GetCursorPos();
+		return true;
+	}
 
-			SetCursorScreenPos(ImVec2(pos.x - pointSize, pos.y - pointSize));
-			PushID(i);
+	void EndFCurve()
+	{
+		EndChildFrame();
+	}
 
-			InvisibleButton("", ImVec2(pointSize * 2, pointSize * 2));
+	bool FCurve(
+		float* keys, float* values,
+		float* leftHandleKeys, float* leftHandleValues,
+		float* rightHandleKeys, float* rightHandleValues,
+		bool* kv_selected,
+		int count,
+		bool isLocked,
+		ImU32 col,
+		bool* selected,
+		int* newCount,
+		float* movedX,
+		float* movedY,
+		int* changedType)
+	{
+		ImGuiWindow* window = GetCurrentWindow();
 
-			if (IsItemHovered())
+		float offset_x = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::OFFSET_X, 0.0f);
+		float offset_y = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::OFFSET_Y, 0.0f);
+
+		float scale_x = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::SCALE_X, 1.0f);
+		float scale_y = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::SCALE_Y, 1.0f);
+
+		const ImRect innerRect = window->InnerRect;
+
+		auto transform_f2s = [&](const ImVec2& p) -> ImVec2
+		{
+			return ImVec2((p.x - offset_x) * scale_x + innerRect.Min.x, (p.y - offset_y) * scale_y + innerRect.Min.y);
+		};
+
+		auto transform_s2f = [&](const ImVec2& p) -> ImVec2
+		{
+			return ImVec2((p.x - innerRect.Min.x) / scale_x + offset_x, (p.y - innerRect.Min.y) / scale_y + offset_y);
+		};
+
+		auto moveFWithS = [&](const ImVec2& p, const ImVec2& d) -> ImVec2
+		{
+			auto sp = transform_f2s(p);
+			sp += d;
+			return transform_s2f(sp);
+		};
+
+		if (isLocked || !(*selected))
+		{
+
+		}
+		else
+		{
+			auto dx = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::DELTA_X, 0.0f);
+			auto dy = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::DELTA_Y, 0.0f);
+
+			// move points
+			int32_t movedIndex = -1;
+
+			for (int i = 0; i < count; i++)
 			{
-				window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55000000);
-				window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55000000);
-				window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55000000);
-				window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55000000);
-			}
+				PushID(i + 1);
 
-			if (IsItemActive() && IsMouseClicked(0))
-			{
-				window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::START_X, pos.x);
-				window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::START_Y, pos.y);
-			}
+				auto isChanged = false;
+				float pointSize = 4;
 
-			if (IsItemActive() && IsMouseDragging(0))
-			{
-				pos.x = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::START_X, pos.x);
-				pos.y = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::START_Y, pos.y);
-				pos += ImGui::GetMouseDragDelta();
-				auto v = transform_s2f(pos);
-				keys1[i] = v.x;
-				values1[i] = v.y;
-				isChanged = true;
+				auto pos = transform_f2s(ImVec2(keys[i], values[i]));
+				auto cursorPos = GetCursorPos();
 
-				if (0 < i)
+				SetCursorScreenPos(ImVec2(pos.x - pointSize, pos.y - pointSize));
+
+				InvisibleButton("", ImVec2(pointSize * 2, pointSize * 2));
+
+				if (IsItemHovered())
 				{
-					if (keys1[i] < keys1[i - 1])
+					window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55000000);
+					window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55000000);
+					window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55000000);
+					window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55000000);
+				}
+
+				if (IsItemActive() && IsMouseClicked(0))
+				{
+					if (!GetIO().KeyShift)
 					{
-						std::swap(keys1[i], keys1[i - 1]);
-						std::swap(values1[i], values1[i - 1]);
+						for (int j = 0; j < count; j++)
+						{
+							kv_selected[j] = false;
+						}
+					}
+					
+					kv_selected[i] = !kv_selected[i];
+				}
+
+				if (IsItemActive() && IsMouseDragging(0))
+				{
+					movedIndex = i;
+					isChanged = true;
+				}
+
+				PopID();
+				SetCursorScreenPos(cursorPos);
+
+				if (isChanged)
+				{
+					if (changedType != nullptr)
+					{
+						(*changedType) = 0;
+
+						if (movedX != nullptr) (*movedX) = dx;
+						if (movedY != nullptr) (*movedY) = dy;
+					}
+
+					break;
+				}
+			}
+
+			// move points acctually
+			if (movedIndex >= 0)
+			{
+				for (int i = 0; i < count; i++)
+				{
+					if (!kv_selected[i]) continue;
+
+					{
+						auto v = moveFWithS(ImVec2(keys[i], values[i]), ImVec2(dx, dy));
+						keys[i] = v.x;
+						values[i] = v.y;
+					}
+					
+					{
+						auto v = moveFWithS(ImVec2(leftHandleKeys[i], leftHandleValues[i]), ImVec2(dx, dy));
+						leftHandleKeys[i] = v.x;
+						leftHandleValues[i] = v.y;
+					}
+
+					{
+						auto v = moveFWithS(ImVec2(rightHandleKeys[i], rightHandleValues[i]), ImVec2(dx, dy));
+						rightHandleKeys[i] = v.x;
+						rightHandleValues[i] = v.y;
 					}
 				}
 
-				if (i + 1 < count1)
+				for (int i = 0; i < count; i++)
 				{
-					if (keys1[i + 1] < keys1[i])
+					if (0 < i)
 					{
-						std::swap(keys1[i], keys1[i + 1]);
-						std::swap(values1[i], values1[i + 1]);
+						leftHandleKeys[i] = std::max(leftHandleKeys[i], keys[i - 1]);
+					}
+
+					leftHandleKeys[i] = std::min(leftHandleKeys[i], keys[i]);
+
+					if (i < count - 1)
+					{
+						rightHandleKeys[i] = std::min(rightHandleKeys[i], keys[i + 1]);
+					}
+
+					rightHandleKeys[i] = std::max(rightHandleKeys[i], keys[i]);
+				}
+
+				// check values
+				bool isChanged = true;
+
+				while (isChanged)
+				{
+					isChanged = false;
+					auto i = movedIndex;
+
+					if (0 < i)
+					{
+						if (keys[i - 1] > keys[i])
+						{
+							std::swap(keys[i], keys[i - 1]);
+							std::swap(values[i], values[i - 1]);
+							std::swap(kv_selected[i], kv_selected[i - 1]);
+							std::swap(leftHandleKeys[i], leftHandleKeys[i - 1]);
+							std::swap(leftHandleValues[i], leftHandleValues[i - 1]);
+							std::swap(rightHandleKeys[i], rightHandleKeys[i - 1]);
+							std::swap(rightHandleValues[i], rightHandleValues[i - 1]);
+
+							// To change button
+							PushID(i - 1 + 1);
+							auto id = GetID("");
+							PopID();
+
+							SetActiveID(id, window);
+
+							movedIndex = i - 1;
+							isChanged = true;
+						}
+					}
+
+					i = movedIndex;
+
+					if (i + 1 < count)
+					{
+						if (keys[i] > keys[i + 1])
+						{
+							std::swap(keys[i], keys[i + 1]);
+							std::swap(values[i], values[i + 1]);
+							std::swap(kv_selected[i], kv_selected[i + 1]);
+							std::swap(leftHandleKeys[i], leftHandleKeys[i + 1]);
+							std::swap(leftHandleValues[i], leftHandleValues[i + 1]);
+							std::swap(rightHandleKeys[i], rightHandleKeys[i + 1]);
+							std::swap(rightHandleValues[i], rightHandleValues[i + 1]);
+
+							// To change button
+							PushID(i + 1 + 1);
+							auto id = GetID("");
+							PopID();
+
+							SetActiveID(id, window);
+
+							movedIndex = i + 1;
+							isChanged = true;
+						}
 					}
 				}
 			}
 
-			PopID();
-			SetCursorScreenPos(cursorPos);
-
-			if (isChanged)
+			// move left handles
+			int32_t movedLIndex = -1;
+			for (int i = 0; i < count; i++)
 			{
-				break;
+				if (!kv_selected[i]) continue;
+
+				auto isChanged = false;
+				float pointSize = 4;
+
+				auto centerPos = transform_f2s(ImVec2(keys[i], values[i]));
+				auto pos = transform_f2s(ImVec2(leftHandleKeys[i], leftHandleValues[i]));
+				auto cursorPos = GetCursorPos();
+
+				SetCursorScreenPos(ImVec2(pos.x - pointSize, pos.y - pointSize));
+				PushID(i + 0x1f0);
+
+				InvisibleButton("", ImVec2(pointSize * 2, pointSize * 2));
+
+				window->DrawList->AddLine(pos, centerPos, 0x55000000);
+
+				if (IsItemHovered())
+				{
+					window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55000000);
+					window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55000000);
+					window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55000000);
+					window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55000000);
+				}
+
+				if (IsItemActive() && IsMouseClicked(0))
+				{
+				}
+
+				if (IsItemActive() && IsMouseDragging(0))
+				{
+					isChanged = true;
+					movedLIndex = i;
+				}
+
+				PopID();
+				SetCursorScreenPos(cursorPos);
+
+				if (isChanged)
+				{
+					if (changedType != nullptr)
+					{
+						(*changedType) = 1;
+
+						if (movedX != nullptr) (*movedX) = dx;
+						if (movedY != nullptr) (*movedY) = dy;
+					}
+
+					break;
+				}
+			}
+
+			if (movedLIndex >= 0)
+			{
+				for (int i = 0; i < count; i++)
+				{
+					if (!kv_selected[i]) continue;
+
+					auto v = moveFWithS(ImVec2(leftHandleKeys[i], leftHandleValues[i]), ImVec2(dx, dy));
+					leftHandleKeys[i] = v.x;
+					leftHandleValues[i] = v.y;
+
+					// movable area is limited
+					if (0 < i)
+					{
+						leftHandleKeys[i] = std::max(leftHandleKeys[i], keys[i - 1]);
+					}
+
+					leftHandleKeys[i] = std::min(leftHandleKeys[i], keys[i]);
+				}
+			}
+
+			// move right handles
+			int32_t movedRIndex = -1;
+			for (int i = 0; i < count; i++)
+			{
+				if (!kv_selected[i]) continue;
+
+				auto isChanged = false;
+				float pointSize = 4;
+
+				auto centerPos = transform_f2s(ImVec2(keys[i], values[i]));
+				auto pos = transform_f2s(ImVec2(rightHandleKeys[i], rightHandleValues[i]));
+				auto cursorPos = GetCursorPos();
+
+				SetCursorScreenPos(ImVec2(pos.x - pointSize, pos.y - pointSize));
+				PushID(i + 0xaf0);
+
+				InvisibleButton("", ImVec2(pointSize * 2, pointSize * 2));
+
+				window->DrawList->AddLine(pos, centerPos, 0x55000000);
+
+				if (IsItemHovered())
+				{
+					window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55000000);
+					window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55000000);
+					window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55000000);
+					window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55000000);
+				}
+
+				if (IsItemActive() && IsMouseClicked(0))
+				{
+				}
+
+				if (IsItemActive() && IsMouseDragging(0))
+				{
+					isChanged = true;
+					movedRIndex = i;
+				}
+
+				PopID();
+				SetCursorScreenPos(cursorPos);
+
+				if (isChanged)
+				{
+					if (changedType != nullptr)
+					{
+						(*changedType) = 2;
+
+						if (movedX != nullptr) (*movedX) = dx;
+						if (movedY != nullptr) (*movedY) = dy;
+					}
+
+					break;
+				}
+			}
+
+			if (movedRIndex >= 0)
+			{
+				for (int i = 0; i < count; i++)
+				{
+					if (!kv_selected[i]) continue;
+
+					auto v = moveFWithS(ImVec2(rightHandleKeys[i], rightHandleValues[i]), ImVec2(dx, dy));
+					rightHandleKeys[i] = v.x;
+					rightHandleValues[i] = v.y;
+
+					// movable area is limited
+					if (i < count - 1)
+					{
+						rightHandleKeys[i] = std::min(rightHandleKeys[i], keys[i + 1]);
+					}
+
+					rightHandleKeys[i] = std::max(rightHandleKeys[i], keys[i]);
+				}
 			}
 		}
 
-		/*
-		// move handles
-		for (int i = 0; i < count1; i++)
-		{
-			auto isChanged = false;
-			float pointSize = 4;
-
-			auto pos = transform_f2s(ImVec2(leftHandleKeys1[i], leftHandleValue1[i]));
-			auto cursorPos = GetCursorPos();
-
-			SetCursorScreenPos(ImVec2(pos.x - pointSize, pos.y - pointSize));
-			PushID(i);
-
-			InvisibleButton("", ImVec2(pointSize * 2, pointSize * 2));
-
-			if (IsItemHovered())
-			{
-				window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55000000);
-				window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55000000);
-				window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55000000);
-				window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55000000);
-			}
-
-			if (IsItemActive() && IsMouseClicked(0))
-			{
-				window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::START_X, pos.x);
-				window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::START_Y, pos.y);
-			}
-
-			if (IsItemActive() && IsMouseDragging(0))
-			{
-				pos.x = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::START_X, pos.x);
-				pos.y = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::START_Y, pos.y);
-				pos += ImGui::GetMouseDragDelta();
-				auto v = transform_s2f(pos);
-				keys1[i] = v.x;
-				values1[i] = v.y;
-				isChanged = true;
-
-				if (0 < i)
-				{
-					if (keys1[i] < keys1[i - 1])
-					{
-						std::swap(keys1[i], keys1[i - 1]);
-						std::swap(values1[i], values1[i - 1]);
-					}
-				}
-
-				if (i + 1 < count1)
-				{
-					if (keys1[i + 1] < keys1[i])
-					{
-						std::swap(keys1[i], keys1[i + 1]);
-						std::swap(values1[i], values1[i + 1]);
-					}
-				}
-			}
-
-			PopID();
-			SetCursorScreenPos(cursorPos);
-
-			if (isChanged)
-			{
-				break;
-			}
-		}
-		*/
 
 		// render curve
-		for(int i = 0; i < count1 - 1; i++)
+		for (int i = 0; i < count - 1; i++)
 		{
-			auto v1 = ImVec2(keys1[i+0], values1[i+0]);
-			auto v2 = ImVec2(keys1[i+1], values1[i+1]);
+			auto v1 = ImVec2(keys[i + 0], values[i + 0]);
+			auto v2 = ImVec2(keys[i + 1], values[i + 1]);
 			window->DrawList->AddLine(
 				transform_f2s(v1),
 				transform_f2s(v2),
-				0x55000000);
+				col);
 		}
 
+		// render selected
+		for (int i = 0; i < count; i++)
+		{
+			if (!kv_selected[i]) continue;
 
-		EndChildFrame();
+			int pointSize = 4;
+			auto pos = transform_f2s(ImVec2(keys[i], values[i]));
+
+			window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55FFFFFF);
+			window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55FFFFFF);
+			window->DrawList->AddLine(ImVec2(pos.x + pointSize, pos.y), ImVec2(pos.x, pos.y + pointSize), 0x55FFFFFF);
+			window->DrawList->AddLine(ImVec2(pos.x - pointSize, pos.y), ImVec2(pos.x, pos.y - pointSize), 0x55FFFFFF);
+		}
+
+		return true;
 	}
 }
