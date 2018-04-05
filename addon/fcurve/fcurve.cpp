@@ -157,15 +157,17 @@ namespace ImGui
 		float scale_y = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::SCALE_Y, 1.0f);
 
 		const ImRect innerRect = window->InnerRect;
+		float width = innerRect.Max.x - innerRect.Min.x;
+		float height = innerRect.Max.y - innerRect.Min.y;
 
 		auto transform_f2s = [&](const ImVec2& p) -> ImVec2
 		{
-			return ImVec2((p.x - offset_x) * scale_x + innerRect.Min.x, (p.y - offset_y) * scale_y + innerRect.Min.y);
+			return ImVec2((p.x - offset_x) * scale_x + innerRect.Min.x, (- p.y - offset_y) * scale_y + innerRect.Min.y + height / 2);
 		};
 
 		auto transform_s2f = [&](const ImVec2& p) -> ImVec2
 		{
-			return ImVec2((p.x - innerRect.Min.x) / scale_x + offset_x, (p.y - innerRect.Min.y) / scale_y + offset_y);
+			return ImVec2((p.x - innerRect.Min.x) / scale_x + offset_x, -((p.y - innerRect.Min.y - height / 2) / scale_y + offset_y));
 		};
 
 		// zoom with user
@@ -181,7 +183,7 @@ namespace ImGui
 			auto mousePos_f_now = transform_s2f(mousePos);
 
 			offset_x += (mousePos_f_pre.x - mousePos_f_now.x);
-			offset_y += (mousePos_f_pre.y - mousePos_f_now.y);
+			offset_y -= (mousePos_f_pre.y - mousePos_f_now.y);
 
 			window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::SCALE_X, scale_x);
 			window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::SCALE_Y, scale_y);
@@ -215,14 +217,12 @@ namespace ImGui
 		{
 			ImVec2 upperLeft_s = ImVec2(innerRect.Min.x, innerRect.Min.y);
 			ImVec2 lowerRight_s = ImVec2(innerRect.Max.x, innerRect.Max.y);
-			float width = innerRect.Max.x - innerRect.Min.x;
-			float height = innerRect.Max.y - innerRect.Min.y;
-
+			
 			auto upperLeft_f = transform_s2f(upperLeft_s);
 			auto lowerRight_f = transform_s2f(lowerRight_s);
 
 			auto kByPixel = (lowerRight_f.x - upperLeft_f.x) / width;
-			auto vByPixel = (lowerRight_f.y - upperLeft_f.y) / height;
+			auto vByPixel = -(lowerRight_f.y - upperLeft_f.y) / height;
 			auto screenGridSize = 30.0f;
 			auto fieldGridSizeX = screenGridSize * kByPixel;
 			auto fieldGridSizeY = screenGridSize * vByPixel;
@@ -233,32 +233,32 @@ namespace ImGui
 			auto sx = (int)(upperLeft_f.x / fieldGridSizeX) * fieldGridSizeX;
 			auto sy = (int)(upperLeft_f.y / fieldGridSizeY) * fieldGridSizeY;
 			auto ex = (int)(lowerRight_f.x / fieldGridSizeX) * fieldGridSizeX + fieldGridSizeX;
-			auto ey = (int)(lowerRight_f.y / fieldGridSizeY) * fieldGridSizeY + fieldGridSizeY;
+			auto ey = (int)(lowerRight_f.y / fieldGridSizeY) * fieldGridSizeY - fieldGridSizeY;
 
-			for (auto y = sy; y <= ey; y += fieldGridSizeX)
+			for (auto y = sy; y >= ey; y -= fieldGridSizeY)
 			{
 				window->DrawList->AddLine(transform_f2s(ImVec2(upperLeft_f.x, y)), transform_f2s(ImVec2(lowerRight_f.x, y)), 0x55000000);
 			}
 
-			for (auto x = sx; x <= ex; x += fieldGridSizeY)
+			for (auto x = sx; x <= ex; x += fieldGridSizeX)
 			{
 				window->DrawList->AddLine(transform_f2s(ImVec2(x, upperLeft_f.y)), transform_f2s(ImVec2(x, lowerRight_f.y)), 0x55000000);
 			}
 
-			for (auto y = sy; y <= ey; y += fieldGridSizeX)
+			for (auto y = sy; y >= ey; y -= fieldGridSizeY)
 			{
 				char text[200];
-				sprintf(text, "%.3f", y);
+				sprintf(text, "%.2f", y);
 				window->DrawList->AddText(
 					transform_f2s(ImVec2(upperLeft_f.x, y)),
 					0xff000000,
 					text);
 			}
 
-			for (auto x = sx; x <= ex; x += fieldGridSizeY)
+			for (auto x = sx; x <= ex; x += fieldGridSizeX)
 			{
 				char text[200];
-				sprintf(text, "%.3f", x);
+				sprintf(text, "%.2f", x);
 				window->DrawList->AddText(
 					transform_f2s(ImVec2(x, upperLeft_f.y)),
 					0xff000000,
@@ -314,15 +314,17 @@ namespace ImGui
 		float scale_y = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::SCALE_Y, 1.0f);
 
 		const ImRect innerRect = window->InnerRect;
+		float width = innerRect.Max.x - innerRect.Min.x;
+		float height = innerRect.Max.y - innerRect.Min.y;
 
 		auto transform_f2s = [&](const ImVec2& p) -> ImVec2
 		{
-			return ImVec2((p.x - offset_x) * scale_x + innerRect.Min.x, (p.y - offset_y) * scale_y + innerRect.Min.y);
+			return ImVec2((p.x - offset_x) * scale_x + innerRect.Min.x, (-p.y - offset_y) * scale_y + innerRect.Min.y + height / 2);
 		};
 
 		auto transform_s2f = [&](const ImVec2& p) -> ImVec2
 		{
-			return ImVec2((p.x - innerRect.Min.x) / scale_x + offset_x, (p.y - innerRect.Min.y) / scale_y + offset_y);
+			return ImVec2((p.x - innerRect.Min.x) / scale_x + offset_x, -((p.y - innerRect.Min.y - height / 2) / scale_y + offset_y));
 		};
 
 		auto moveFWithS = [&](const ImVec2& p, const ImVec2& d) -> ImVec2
