@@ -99,6 +99,7 @@ LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 #include <vector>
 #include <array>
+#include <algorithm>
 
 struct FCurveProperty
 {
@@ -256,13 +257,19 @@ int main(int, char**)
 		{
 			ImGui::Begin("FCurve", &show_fcurve_window);
 
-			if (ImGui::BeginFCurve())
+			if (ImGui::BeginFCurve(1))
 			{
+				bool canControl = true;
+
 				for (int i = 0; i < props.size(); i++)
 				{
 					auto& prop = props[i];
 
 					bool isSelected = false;
+
+					float movedX = 0.0f;
+					float movedY = 0.0f;
+					int changedType = 0;
 
 					if (ImGui::FCurve(
 						i,
@@ -270,15 +277,86 @@ int main(int, char**)
 						(bool*)prop.kv_selected.data(),
 						prop.count,
 						false,
+						canControl,
 						prop.col,
 						prop.isSelected,
 						&prop.count,
 						&isSelected,
-						nullptr,
-						nullptr,
-						nullptr
+						&movedX,
+						&movedY,
+						&changedType
 					))
 					{
+						canControl = false;
+
+						if (movedX != 0 || movedY != 0)
+						{
+							for (int j = 0; j < props.size(); j++)
+							{
+								if (i == j) continue;
+								if (!props[j].isSelected) continue;
+
+								for (int k = 0; k < props[j].count; k++)
+								{
+									if (!props[j].kv_selected[k]) continue;
+
+									if (changedType == 0)
+									{
+										props[j].keys[k] += movedX;
+										props[j].values[k] += movedY;
+										props[j].left_keys[k] += movedX;
+										props[j].left_values[k] += movedY;
+										props[j].right_keys[k] += movedX;
+										props[j].right_values[k] += movedY;
+									}
+									if (changedType == 1)
+									{
+										props[j].left_keys[k] += movedX;
+										props[j].left_values[k] += movedY;
+									}
+									if (changedType == 2)
+									{
+										props[j].right_keys[k] += movedX;
+										props[j].right_values[k] += movedY;
+									}
+								}
+
+								struct KI
+								{
+									float K = 0.0f;
+									int32_t	Ind = -1;
+								};
+
+								std::vector<KI> kis;
+
+								for (int32_t i = 0; i < props[j].count; i++)
+								{
+									KI ki;
+									ki.K = props[j].keys[i];
+									ki.Ind = i;
+									kis.push_back(ki);
+								}
+
+								std::sort(kis.begin(), kis.end(),
+									[](const KI& x, const KI& y)
+								{
+									return x.K < y.K;
+								});
+
+								auto prop_temp = props[j];
+
+								for (int k = 0; k < props[j].count; k++)
+								{
+									props[j].keys[k] = prop_temp.keys[kis[k].Ind];
+									props[j].values[k] = prop_temp.values[kis[k].Ind];
+									props[j].left_keys[k] = prop_temp.left_keys[kis[k].Ind];
+									props[j].left_values[k] = prop_temp.left_values[kis[k].Ind];
+									props[j].right_keys[k] = prop_temp.right_keys[kis[k].Ind];
+									props[j].right_values[k] = prop_temp.right_values[kis[k].Ind];
+								}
+							}
+						}
+
 						if (isSelected)
 						{
 							if (ImGui::GetIO().KeyShift)
@@ -293,6 +371,18 @@ int main(int, char**)
 								}
 								prop.isSelected = true;
 							}
+						}
+
+						// sort
+						if (prop.count + 1 != prop.keys.size())
+						{
+							prop.keys.resize(prop.count + 1);
+							prop.values.resize(prop.count + 1);
+							prop.left_keys.resize(prop.count + 1);
+							prop.left_values.resize(prop.count + 1);
+							prop.right_keys.resize(prop.count + 1);
+							prop.right_values.resize(prop.count + 1);
+							prop.kv_selected.resize(prop.count + 1);
 						}
 					}
 				}				

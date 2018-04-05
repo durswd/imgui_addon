@@ -136,9 +136,9 @@ namespace ImGui
 	}
 
 
-	bool BeginFCurve()
+	bool BeginFCurve(int id)
 	{
-		if (!BeginChildFrame(1, ImVec2(200, 200), ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+		if (!BeginChildFrame(id, ImVec2(0, 0), ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
 		{
 			return false;
 		}
@@ -171,11 +171,22 @@ namespace ImGui
 		// zoom with user
 		if (ImGui::GetIO().MouseWheel != 0 && ImGui::IsWindowHovered())
 		{
+			auto mousePos = GetMousePos();
+			auto mousePos_f_pre = transform_s2f(mousePos);
+
 			auto s = powf(2, ImGui::GetIO().MouseWheel / 10.0);
 			scale_x *= s;
 			scale_y *= s;
+
+			auto mousePos_f_now = transform_s2f(mousePos);
+
+			offset_x += (mousePos_f_pre.x - mousePos_f_now.x);
+			offset_y += (mousePos_f_pre.y - mousePos_f_now.y);
+
 			window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::SCALE_X, scale_x);
 			window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::SCALE_Y, scale_y);
+			window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::OFFSET_X, offset_x);
+			window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::OFFSET_Y, offset_y);
 		}
 
 		// pan with user
@@ -186,8 +197,8 @@ namespace ImGui
 		if (window->StateStorage.GetBool((ImGuiID)FCurveStorageValues::IS_PANNING, false))
 		{
 			ImVec2 drag_offset = ImGui::GetMouseDragDelta(1);
-			offset_x = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::START_X) - drag_offset.x;
-			offset_y = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::START_Y) - drag_offset.y;
+			offset_x = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::START_X) - drag_offset.x / scale_x;
+			offset_y = window->StateStorage.GetFloat((ImGuiID)FCurveStorageValues::START_Y) - drag_offset.y / scale_y;
 
 			window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::OFFSET_X, offset_x);
 			window->StateStorage.SetFloat((ImGuiID)FCurveStorageValues::OFFSET_Y, offset_y);
@@ -204,24 +215,54 @@ namespace ImGui
 		{
 			ImVec2 upperLeft_s = ImVec2(innerRect.Min.x, innerRect.Min.y);
 			ImVec2 lowerRight_s = ImVec2(innerRect.Max.x, innerRect.Max.y);
+			float width = innerRect.Max.x - innerRect.Min.x;
+			float height = innerRect.Max.y - innerRect.Min.y;
 
 			auto upperLeft_f = transform_s2f(upperLeft_s);
 			auto lowerRight_f = transform_s2f(lowerRight_s);
 
-			auto gridSize = 20.0f;
-			auto sx = (int)(upperLeft_f.x / gridSize) * gridSize;
-			auto sy = (int)(upperLeft_f.y / gridSize) * gridSize;
-			auto ex = (int)(lowerRight_f.x / gridSize) * gridSize + gridSize;
-			auto ey = (int)(lowerRight_f.y / gridSize) * gridSize + gridSize;
+			auto kByPixel = (lowerRight_f.x - upperLeft_f.x) / width;
+			auto vByPixel = (lowerRight_f.y - upperLeft_f.y) / height;
+			auto screenGridSize = 30.0f;
+			auto fieldGridSizeX = screenGridSize * kByPixel;
+			auto fieldGridSizeY = screenGridSize * vByPixel;
 
-			for (auto y = sy; y <= ey; y += gridSize)
+			fieldGridSizeX  = pow(10.0f, (int32_t)log10(fieldGridSizeX * 2.0) + 1) / 2.0;
+			fieldGridSizeY = pow(10.0f, (int32_t)log10(fieldGridSizeY * 2.0) + 1) / 2.0;
+
+			auto sx = (int)(upperLeft_f.x / fieldGridSizeX) * fieldGridSizeX;
+			auto sy = (int)(upperLeft_f.y / fieldGridSizeY) * fieldGridSizeY;
+			auto ex = (int)(lowerRight_f.x / fieldGridSizeX) * fieldGridSizeX + fieldGridSizeX;
+			auto ey = (int)(lowerRight_f.y / fieldGridSizeY) * fieldGridSizeY + fieldGridSizeY;
+
+			for (auto y = sy; y <= ey; y += fieldGridSizeX)
 			{
 				window->DrawList->AddLine(transform_f2s(ImVec2(upperLeft_f.x, y)), transform_f2s(ImVec2(lowerRight_f.x, y)), 0x55000000);
 			}
 
-			for (auto x = sx; x <= ex; x += gridSize)
+			for (auto x = sx; x <= ex; x += fieldGridSizeY)
 			{
 				window->DrawList->AddLine(transform_f2s(ImVec2(x, upperLeft_f.y)), transform_f2s(ImVec2(x, lowerRight_f.y)), 0x55000000);
+			}
+
+			for (auto y = sy; y <= ey; y += fieldGridSizeX)
+			{
+				char text[200];
+				sprintf(text, "%.3f", y);
+				window->DrawList->AddText(
+					transform_f2s(ImVec2(upperLeft_f.x, y)),
+					0xff000000,
+					text);
+			}
+
+			for (auto x = sx; x <= ex; x += fieldGridSizeY)
+			{
+				char text[200];
+				sprintf(text, "%.3f", x);
+				window->DrawList->AddText(
+					transform_f2s(ImVec2(x, upperLeft_f.y)),
+					0xff000000,
+					text);
 			}
 		}
 
@@ -253,6 +294,7 @@ namespace ImGui
 		bool* kv_selected,
 		int count,
 		bool isLocked,
+		bool canControl,
 		ImU32 col,
 		bool selected,
 		int* newCount,
@@ -290,7 +332,7 @@ namespace ImGui
 			return transform_s2f(sp);
 		};
 
-		bool hasControlled = false;
+		bool hasControlled = !canControl;
 
 		if (isLocked)
 		{
@@ -356,8 +398,8 @@ namespace ImGui
 					{
 						(*changedType) = 0;
 
-						if (movedX != nullptr) (*movedX) = dx;
-						if (movedY != nullptr) (*movedY) = dy;
+						if (movedX != nullptr) (*movedX) = dx / scale_x;
+						if (movedY != nullptr) (*movedY) = dy / scale_y;
 					}
 
 					break;
@@ -515,8 +557,8 @@ namespace ImGui
 					{
 						(*changedType) = 1;
 
-						if (movedX != nullptr) (*movedX) = dx;
-						if (movedY != nullptr) (*movedY) = dy;
+						if (movedX != nullptr) (*movedX) = dx / scale_x;
+						if (movedY != nullptr) (*movedY) = dy / scale_y;
 					}
 
 					break;
@@ -591,8 +633,8 @@ namespace ImGui
 					{
 						(*changedType) = 2;
 
-						if (movedX != nullptr) (*movedX) = dx;
-						if (movedY != nullptr) (*movedY) = dy;
+						if (movedX != nullptr) (*movedX) = dx / scale_x;
+						if (movedY != nullptr) (*movedY) = dy / scale_y;
 					}
 
 					break;
@@ -720,6 +762,7 @@ namespace ImGui
 			if (isLineHovered)
 			{
 				(*newSelected) = (*newSelected) | isLineHovered;
+				hasControlled = true;
 			}
 		}
 

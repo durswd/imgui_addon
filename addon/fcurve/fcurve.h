@@ -11,7 +11,7 @@ namespace ImGui
 		Cubic,
 	};
 
-	bool BeginFCurve();
+	bool BeginFCurve(int id);
 
 	void EndFCurve();
 
@@ -23,6 +23,7 @@ namespace ImGui
 		bool* kv_selected,
 		int count,
 		bool isLocked,
+		bool canControl,
 		ImU32 col,
 		bool selected,
 		int* newCount,
