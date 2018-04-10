@@ -5,10 +5,17 @@
 
 namespace ImGui
 {
-	enum class ImInterporationType
+	enum class ImFCurveInterporationType
 	{
-		Linear,
+		Linear = 0,
 		Cubic,
+	};
+
+	enum class ImFCurveEdgeType
+	{
+		Constant = 0,
+		Loop = 1,
+		LoopInversely = 2,
 	};
 
 	bool BeginFCurve(int id);
@@ -20,8 +27,12 @@ namespace ImGui
 		float* keys, float* values,
 		float* leftHandleKeys, float* leftHandleValues,
 		float* rightHandleKeys, float* rightHandleValues,
+		ImFCurveInterporationType* interporations,
+		ImFCurveEdgeType startEdge,
+		ImFCurveEdgeType endEdge,
 		bool* kv_selected,
 		int count,
+		float defaultValue,
 		bool isLocked,
 		bool canControl,
 		ImU32 col,

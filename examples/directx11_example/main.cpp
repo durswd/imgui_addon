@@ -114,6 +114,8 @@ struct FCurveProperty
 
 	std::vector<int8_t> kv_selected;
 
+	std::vector<ImGui::ImFCurveInterporationType> interporations;
+
 	bool isSelected = false;
 	int count = 2;
 	ImColor col = 0xff0000ff;
@@ -134,6 +136,8 @@ struct FCurveProperty
 			right_keys.push_back(k + 5);
 			right_values.push_back(v + 5);
 
+			interporations.push_back(ImGui::ImFCurveInterporationType::Cubic);
+
 			kv_selected.push_back(0);
 		}
 
@@ -143,7 +147,7 @@ struct FCurveProperty
 		left_values.push_back(0);
 		right_keys.push_back(0);
 		right_values.push_back(0);
-
+		interporations.push_back(ImGui::ImFCurveInterporationType::Cubic);
 		kv_selected.push_back(0);
 	}
 };
@@ -274,8 +278,12 @@ int main(int, char**)
 					if (ImGui::FCurve(
 						i,
 						prop.keys.data(), prop.values.data(), prop.left_keys.data(), prop.left_values.data(), prop.right_keys.data(), prop.right_values.data(),
+						prop.interporations.data(),
+						ImGui::ImFCurveEdgeType::Constant,
+						ImGui::ImFCurveEdgeType::Constant,
 						(bool*)prop.kv_selected.data(),
 						prop.count,
+						0.0,
 						false,
 						canControl,
 						prop.col,
@@ -382,6 +390,7 @@ int main(int, char**)
 							prop.left_values.resize(prop.count + 1);
 							prop.right_keys.resize(prop.count + 1);
 							prop.right_values.resize(prop.count + 1);
+							prop.interporations.resize(prop.count + 1);
 							prop.kv_selected.resize(prop.count + 1);
 						}
 					}
