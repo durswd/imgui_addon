@@ -830,15 +830,27 @@ namespace ImGui
 						auto cp1 = ImVec2(-rightHandleKeys[i + 0] + offset, rightHandleValues[i + 0]);
 						auto cp2 = ImVec2(-leftHandleKeys[i + 1] + offset, leftHandleValues[i + 1]);
 
-						isLineHovered = isLineHovered | IsHoveredOnBezierCurve(
-							GetMousePos(), window,
-							transform_f2s(v1),
-							transform_f2s(cp1),
-							transform_f2s(cp2),
-							transform_f2s(v2),
-							col,
-							2);
-
+						if (interporations[i] == ImFCurveInterporationType::Cubic)
+						{
+							isLineHovered = isLineHovered | IsHoveredOnBezierCurve(
+								GetMousePos(), window,
+								transform_f2s(v1),
+								transform_f2s(cp1),
+								transform_f2s(cp2),
+								transform_f2s(v2),
+								col,
+								2);
+						}
+						else
+						{
+							isLineHovered = isLineHovered | IsHoveredOnLine(
+								GetMousePos(), window,
+								transform_f2s(v1),
+								transform_f2s(v2),
+								col,
+								2);
+						}
+						
 						if (isLineHovered) break;
 					}
 				}
@@ -852,14 +864,26 @@ namespace ImGui
 						auto cp1 = ImVec2(rightHandleKeys[i + 0] + offset, rightHandleValues[i + 0]);
 						auto cp2 = ImVec2(leftHandleKeys[i + 1] + offset, leftHandleValues[i + 1]);
 
-						isLineHovered = isLineHovered | IsHoveredOnBezierCurve(
-							GetMousePos(), window,
-							transform_f2s(v1),
-							transform_f2s(cp1),
-							transform_f2s(cp2),
-							transform_f2s(v2),
-							col,
-							2);
+						if (interporations[i] == ImFCurveInterporationType::Cubic)
+						{
+							isLineHovered = isLineHovered | IsHoveredOnBezierCurve(
+								GetMousePos(), window,
+								transform_f2s(v1),
+								transform_f2s(cp1),
+								transform_f2s(cp2),
+								transform_f2s(v2),
+								col,
+								2);
+						}
+						else
+						{
+							isLineHovered = isLineHovered | IsHoveredOnLine(
+								GetMousePos(), window,
+								transform_f2s(v1),
+								transform_f2s(v2),
+								col,
+								2);
+						}
 
 						if (isLineHovered) break;
 					}
@@ -1080,13 +1104,24 @@ namespace ImGui
 					auto cp1 = ImVec2(-rightHandleKeys[i + 0] + offset, rightHandleValues[i + 0]);
 					auto cp2 = ImVec2(-leftHandleKeys[i + 1] + offset, leftHandleValues[i + 1]);
 
-					window->DrawList->AddBezierCurve(
-						transform_f2s(v1),
-						transform_f2s(cp1),
-						transform_f2s(cp2),
-						transform_f2s(v2),
-						col,
-						selected ? 2 : 1);
+					if (interporations[i] == ImFCurveInterporationType::Cubic)
+					{
+						window->DrawList->AddBezierCurve(
+							transform_f2s(v1),
+							transform_f2s(cp1),
+							transform_f2s(cp2),
+							transform_f2s(v2),
+							col,
+							selected ? 2 : 1);
+					}
+					else
+					{
+						window->DrawList->AddLine(
+							transform_f2s(v1),
+							transform_f2s(v2),
+							col,
+							selected ? 2 : 1);
+					}
 				}
 			}
 			else
@@ -1099,13 +1134,25 @@ namespace ImGui
 					auto cp1 = ImVec2(rightHandleKeys[i + 0] + offset, rightHandleValues[i + 0]);
 					auto cp2 = ImVec2(leftHandleKeys[i + 1] + offset, leftHandleValues[i + 1]);
 
-					window->DrawList->AddBezierCurve(
-						transform_f2s(v1),
-						transform_f2s(cp1),
-						transform_f2s(cp2),
-						transform_f2s(v2),
-						col,
-						selected ? 2 : 1);
+					if (interporations[i] == ImFCurveInterporationType::Cubic)
+					{
+						window->DrawList->AddBezierCurve(
+							transform_f2s(v1),
+							transform_f2s(cp1),
+							transform_f2s(cp2),
+							transform_f2s(v2),
+							col,
+							selected ? 2 : 1);
+					}
+					else
+					{
+						window->DrawList->AddLine(
+							transform_f2s(v1),
+							transform_f2s(v2),
+							col,
+							selected ? 2 : 1);
+
+					}
 				}
 			}
 		};
