@@ -22,6 +22,12 @@ namespace ImGui
 
 	void EndFCurve();
 
+	bool AddPointFCurve(
+		float* keys, float* values,
+		float* leftHandleKeys, float* leftHandleValues,
+		float* rightHandleKeys, float* rightHandleValues,
+		ImFCurveInterporationType* interporations);
+
 	bool FCurve(
 		int fcurve_id,
 		float* keys, float* values,

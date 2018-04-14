@@ -399,6 +399,15 @@ namespace ImGui
 		return hasControlled;
 	}
 
+	bool AddPointFCurve(
+		float* keys, float* values,
+		float* leftHandleKeys, float* leftHandleValues,
+		float* rightHandleKeys, float* rightHandleValues,
+		ImFCurveInterporationType* interporations)
+	{
+		return false;
+	}
+
 	bool FCurve(
 		int fcurve_id,
 		float* keys, float* values,
@@ -806,51 +815,126 @@ namespace ImGui
 
 		bool isLineHovered = false;
 		{
+			auto checkHovered = [&](float offset, bool isReversed) -> void
+			{
+				if (isReversed)
+				{
+					auto distance = keys[count - 1] - keys[0];
+					offset += distance;
+
+					for (int i = 0; i < count - 1; i++)
+					{
+						auto v1 = ImVec2(-keys[i + 0] + offset, values[i + 0]);
+						auto v2 = ImVec2(-keys[i + 1] + offset, values[i + 1]);
+
+						auto cp1 = ImVec2(-rightHandleKeys[i + 0] + offset, rightHandleValues[i + 0]);
+						auto cp2 = ImVec2(-leftHandleKeys[i + 1] + offset, leftHandleValues[i + 1]);
+
+						isLineHovered = isLineHovered | IsHoveredOnBezierCurve(
+							GetMousePos(), window,
+							transform_f2s(v1),
+							transform_f2s(cp1),
+							transform_f2s(cp2),
+							transform_f2s(v2),
+							col,
+							2);
+
+						if (isLineHovered) break;
+					}
+				}
+				else
+				{
+					for (int i = 0; i < count - 1; i++)
+					{
+						auto v1 = ImVec2(keys[i + 0] + offset, values[i + 0]);
+						auto v2 = ImVec2(keys[i + 1] + offset, values[i + 1]);
+
+						auto cp1 = ImVec2(rightHandleKeys[i + 0] + offset, rightHandleValues[i + 0]);
+						auto cp2 = ImVec2(leftHandleKeys[i + 1] + offset, leftHandleValues[i + 1]);
+
+						isLineHovered = isLineHovered | IsHoveredOnBezierCurve(
+							GetMousePos(), window,
+							transform_f2s(v1),
+							transform_f2s(cp1),
+							transform_f2s(cp2),
+							transform_f2s(v2),
+							col,
+							2);
+
+						if (isLineHovered) break;
+					}
+				}
+			};
+
 			// start
 			{
 				auto v1 = ImVec2(keys[0], values[0]);
 				auto v2 = ImVec2(transform_s2f(innerRect.Min).x, values[0]);
 
-				isLineHovered = isLineHovered | IsHoveredOnLine(
-					GetMousePos(), window,
-					transform_f2s(v1),
-					transform_f2s(v2),
-					col,
-					2);
+				if (startEdge == ImFCurveEdgeType::Constant || count == 1 || keys[0] == keys[count - 1])
+				{
+					isLineHovered = isLineHovered | IsHoveredOnLine(
+						GetMousePos(), window,
+						transform_f2s(v1),
+						transform_f2s(v2),
+						col,
+						2);
+				}
+				else if (startEdge == ImFCurveEdgeType::Loop)
+				{
+					auto distance = keys[count - 1] - keys[0];
+					while (v1.x > v2.x)
+					{
+						v1.x -= distance;
+						checkHovered(v1.x - keys[0], startEdge == ImFCurveEdgeType::LoopInversely);
+					}
+				}
+				else
+				{
+					auto distance = keys[count - 1] - keys[0];
+					while (v1.x > v2.x)
+					{
+						v1.x -= distance;
+						checkHovered(v1.x + keys[0], startEdge == ImFCurveEdgeType::LoopInversely);
+					}
+				}
 			}
 
 			// center
-			for (int i = 0; i < count - 1; i++)
-			{
-				auto v1 = ImVec2(keys[i + 0], values[i + 0]);
-				auto v2 = ImVec2(keys[i + 1], values[i + 1]);
-
-				auto cp1 = ImVec2(rightHandleKeys[i + 0], rightHandleValues[i + 0]);
-				auto cp2 = ImVec2(leftHandleKeys[i + 1], leftHandleValues[i + 1]);
-
-				isLineHovered = isLineHovered | IsHoveredOnBezierCurve(
-					GetMousePos(), window,
-					transform_f2s(v1),
-					transform_f2s(cp1),
-					transform_f2s(cp2),
-					transform_f2s(v2),
-					col,
-					2);
-
-				if (isLineHovered) break;
-			}
+			checkHovered(0, false);
 
 			// end
 			{
 				auto v1 = ImVec2(keys[count - 1], values[count - 1]);
 				auto v2 = ImVec2(transform_s2f(innerRect.Max).x, values[count - 1]);
 
-				isLineHovered = isLineHovered | IsHoveredOnLine(
-					GetMousePos(), window,
-					transform_f2s(v1),
-					transform_f2s(v2),
-					col,
-					2);
+				if (endEdge == ImFCurveEdgeType::Constant || count == 1 || keys[0] == keys[count - 1])
+				{
+					isLineHovered = isLineHovered | IsHoveredOnLine(
+						GetMousePos(), window,
+						transform_f2s(v1),
+						transform_f2s(v2),
+						col,
+						2);
+				}
+				else if (endEdge == ImFCurveEdgeType::Loop)
+				{
+					auto distance = keys[count - 1] - keys[0];
+					while (v1.x < v2.x)
+					{
+						checkHovered(v1.x - keys[0], endEdge == ImFCurveEdgeType::LoopInversely);
+						v1.x += distance;
+					}
+				}
+				else
+				{
+					auto distance = keys[count - 1] - keys[0];
+					while (v1.x < v2.x)
+					{
+						checkHovered(v1.x + keys[0], endEdge == ImFCurveEdgeType::LoopInversely);
+						v1.x += distance;
+					}
+				}
 			}
 		}
 
@@ -981,47 +1065,119 @@ namespace ImGui
 		}
 
 		// render curve
+		auto renderCurve = [&](float offset, bool isReversed) -> void
+		{
+			if (isReversed)
+			{
+				auto distance = keys[count - 1] - keys[0];
+				offset += distance;
 
+				for (int i = 0; i < count - 1; i++)
+				{
+					auto v1 = ImVec2(-keys[i + 0] + offset, values[i + 0]);
+					auto v2 = ImVec2(-keys[i + 1] + offset, values[i + 1]);
+
+					auto cp1 = ImVec2(-rightHandleKeys[i + 0] + offset, rightHandleValues[i + 0]);
+					auto cp2 = ImVec2(-leftHandleKeys[i + 1] + offset, leftHandleValues[i + 1]);
+
+					window->DrawList->AddBezierCurve(
+						transform_f2s(v1),
+						transform_f2s(cp1),
+						transform_f2s(cp2),
+						transform_f2s(v2),
+						col,
+						selected ? 2 : 1);
+				}
+			}
+			else
+			{
+				for (int i = 0; i < count - 1; i++)
+				{
+					auto v1 = ImVec2(keys[i + 0] + offset, values[i + 0]);
+					auto v2 = ImVec2(keys[i + 1] + offset, values[i + 1]);
+
+					auto cp1 = ImVec2(rightHandleKeys[i + 0] + offset, rightHandleValues[i + 0]);
+					auto cp2 = ImVec2(leftHandleKeys[i + 1] + offset, leftHandleValues[i + 1]);
+
+					window->DrawList->AddBezierCurve(
+						transform_f2s(v1),
+						transform_f2s(cp1),
+						transform_f2s(cp2),
+						transform_f2s(v2),
+						col,
+						selected ? 2 : 1);
+				}
+			}
+		};
 		// start
 		{
 			auto v1 = ImVec2(keys[0], values[0]);
 			auto v2 = ImVec2(transform_s2f(innerRect.Min).x, values[0]);
 
-			window->DrawList->AddLine(
-				transform_f2s(v1),
-				transform_f2s(v2),
-				col,
-				selected ? 2 : 1);
+			if (startEdge == ImFCurveEdgeType::Constant || count == 1 || keys[0] == keys[count - 1])
+			{
+				window->DrawList->AddLine(
+					transform_f2s(v1),
+					transform_f2s(v2),
+					col,
+					selected ? 2 : 1);
+			}
+			else if (startEdge == ImFCurveEdgeType::Loop)
+			{
+				auto distance = keys[count - 1] - keys[0];
+				while (v1.x > v2.x)
+				{
+					v1.x -= distance;
+					renderCurve(v1.x - keys[0], startEdge == ImFCurveEdgeType::LoopInversely);
+				}
+			}
+			else
+			{
+				auto distance = keys[count - 1] - keys[0];
+				while (v1.x > v2.x)
+				{
+					v1.x -= distance;
+					renderCurve(v1.x + keys[0], startEdge == ImFCurveEdgeType::LoopInversely);
+				}
+			}
 		}
+
+
 
 		// center
-		for (int i = 0; i < count - 1; i++)
-		{
-			auto v1 = ImVec2(keys[i + 0], values[i + 0]);
-			auto v2 = ImVec2(keys[i + 1], values[i + 1]);
-
-			auto cp1 = ImVec2(rightHandleKeys[i + 0], rightHandleValues[i + 0]);
-			auto cp2 = ImVec2(leftHandleKeys[i + 1], leftHandleValues[i + 1]);
-
-			window->DrawList->AddBezierCurve(
-				transform_f2s(v1),
-				transform_f2s(cp1),
-				transform_f2s(cp2),
-				transform_f2s(v2),
-				col,
-				selected ? 2 : 1);
-		}
+		renderCurve(0, false);
 
 		// end
 		{
 			auto v1 = ImVec2(keys[count - 1], values[count - 1]);
 			auto v2 = ImVec2(transform_s2f(innerRect.Max).x, values[count - 1]);
 
-			window->DrawList->AddLine(
-				transform_f2s(v1),
-				transform_f2s(v2),
-				col,
-				selected ? 2 : 1);
+			if (endEdge == ImFCurveEdgeType::Constant || count == 1 || keys[0] == keys[count - 1])
+			{
+				window->DrawList->AddLine(
+					transform_f2s(v1),
+					transform_f2s(v2),
+					col,
+					selected ? 2 : 1);
+			}
+			else if(endEdge == ImFCurveEdgeType::Loop)
+			{
+				auto distance = keys[count - 1] - keys[0];
+				while (v1.x < v2.x)
+				{
+					renderCurve(v1.x - keys[0], endEdge == ImFCurveEdgeType::LoopInversely);
+					v1.x += distance;
+				}
+			}
+			else
+			{
+				auto distance = keys[count - 1] - keys[0];
+				while (v1.x < v2.x)
+				{
+					renderCurve(v1.x + keys[0], endEdge == ImFCurveEdgeType::LoopInversely);
+					v1.x += distance;
+				}
+			}
 		}
 
 		// render points

@@ -280,7 +280,7 @@ int main(int, char**)
 						prop.keys.data(), prop.values.data(), prop.left_keys.data(), prop.left_values.data(), prop.right_keys.data(), prop.right_values.data(),
 						prop.interporations.data(),
 						ImGui::ImFCurveEdgeType::Constant,
-						ImGui::ImFCurveEdgeType::Constant,
+						ImGui::ImFCurveEdgeType::LoopInversely,
 						(bool*)prop.kv_selected.data(),
 						prop.count,
 						0.0,
