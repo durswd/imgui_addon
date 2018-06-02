@@ -423,6 +423,8 @@ namespace ImGui
 		bool canControl,
 		ImU32 col,
 		bool selected,
+		float v_min,
+		float v_max,
 		int* newCount,
 		bool* newSelected,
 		float* movedX,
@@ -561,22 +563,25 @@ namespace ImGui
 				{
 					if (!kv_selected[i]) continue;
 
-					{
-						auto v = moveFWithS(ImVec2(keys[i], values[i]), ImVec2(dx, dy));
-						keys[i] = v.x;
-						values[i] = v.y;
-					}
+					auto pre_center_v = ImVec2(keys[i], values[i]);
+					auto center_v = moveFWithS(ImVec2(keys[i], values[i]), ImVec2(dx, dy));
+					center_v.y = std::max(std::min(center_v.y, v_max), v_min);
 
+					keys[i] = center_v.x;
+					values[i] = center_v.y;
+					
+					auto diff_x = center_v.x - pre_center_v.x;
+					auto diff_y = center_v.y - pre_center_v.y;
+					
 					{
-						auto v = moveFWithS(ImVec2(leftHandleKeys[i], leftHandleValues[i]), ImVec2(dx, dy));
-						leftHandleKeys[i] = v.x;
-						leftHandleValues[i] = v.y;
+						leftHandleKeys[i] += diff_x;
+						leftHandleValues[i] += diff_y;						
 					}
 
 					{
 						auto v = moveFWithS(ImVec2(rightHandleKeys[i], rightHandleValues[i]), ImVec2(dx, dy));
-						rightHandleKeys[i] = v.x;
-						rightHandleValues[i] = v.y;
+						rightHandleKeys[i] += diff_x;
+						rightHandleValues[i] += diff_y;
 					}
 				}
 

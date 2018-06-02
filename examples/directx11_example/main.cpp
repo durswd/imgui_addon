@@ -288,6 +288,8 @@ int main(int, char**)
 						canControl,
 						prop.col,
 						prop.isSelected,
+						-100,
+						100,
 						&prop.count,
 						&isSelected,
 						&movedX,
