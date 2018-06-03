@@ -117,7 +117,7 @@ struct FCurveProperty
 	std::vector<ImGui::ImFCurveInterporationType> interporations;
 
 	bool isSelected = false;
-	int count = 2;
+	int count = 0;
 	ImColor col = 0xff0000ff;
 
 	FCurveProperty()
@@ -261,7 +261,7 @@ int main(int, char**)
 		{
 			ImGui::Begin("FCurve", &show_fcurve_window);
 
-			if (ImGui::BeginFCurve(1))
+			if (ImGui::BeginFCurve(1, 0.75))
 			{
 				bool canControl = true;
 
@@ -283,7 +283,7 @@ int main(int, char**)
 						ImGui::ImFCurveEdgeType::LoopInversely,
 						(bool*)prop.kv_selected.data(),
 						prop.count,
-						0.0,
+						255.0,
 						false,
 						canControl,
 						prop.col,
